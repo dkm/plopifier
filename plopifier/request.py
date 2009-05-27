@@ -20,6 +20,7 @@
 
 from pysqlite2 import dbapi2 as sqlite
 from datetime import datetime
+import os.path
 
 class Request:
     def __init__(self, sqfile, absroot=None):
@@ -33,9 +34,9 @@ class Request:
         print q
         self.cur.execute(q)
         if self.absroot != None:
-            return ["%s/%s/%s" %(self.absroot, x[0], x[1]) for x in self.cur.fetchall()]
+            return [os.path.abspath("%s/%s/%s" %(self.absroot, x[0], x[1])) for x in self.cur.fetchall()]
         else:
-            return ["/%s/%s" %(x[0], x[1]) for x in self.cur.fetchall()]
+            return [os.path.abspath("/%s/%s" %(x[0], x[1])) for x in self.cur.fetchall()]
 
     def __del__(self):
         self.cnx.close()

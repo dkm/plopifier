@@ -23,9 +23,10 @@ import sys
 import os
 
 import tempfile
-from datetime import datetime
+from datetime import datetime,timedelta
+from subprocess import Popen
 
-from plopifier import request
+from plopifier import request,vimeo
 
 #mencoder mf://@filelist.ok 
 #  -mf w=640:h=480:fps=25:type=jpg 
@@ -62,16 +63,32 @@ def build_video (file_list, duration, output_filename, fps=25):
     cmd += cmdargs
     cmd += "-o " + output_filename
     
-    print cmd
+    p = Popen(cmd, shell=True)
+    print "finished with %s" %cmd
+    sts = os.waitpid(p.pid, 0)
+    os.unlink(flist)
 
 
-
- 
+vimeo_apikey = sys.argv[1]
+vimeo_secret = sys.argv[2]
+vimeo_authtok = sys.argv[3]
 
 sq = request.Request("/mnt/ft-1/webcam/test.sqlite","/mnt/ft-1/webcam" )
 
-files = sq.get_files(datetime(2008,02,02,06), datetime(2008, 02, 02, 21))
+delta = timedelta(1)
+start = datetime(2008,02,02)
 
-print "files: ", len(files)
+morning = timedelta(0,0,0,0,0,6)
+full_day = timedelta(0,0,0,0,0,15)
 
-build_video(files, 20, "output")
+today = start
+
+v = vimeo.Vimeo(vimeo_apikey, vimeo_secret, vimeo_authtok)
+
+tags = ["Saint Eynard", "nuages", "clouds"]
+
+for i in xrange(20):
+    files = sq.get_files(today+morning, today + morning + full_day)
+    today += delta
+    build_video(files, 120, "/tmp/saint-eynard.avi")
+    v.upload("/tmp/saint-eynard.avi", str(today), tags)

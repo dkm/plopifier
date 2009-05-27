@@ -152,7 +152,7 @@ class Vimeo:
         print "Username: %s [%s]" % (un.text, uid)
 
 
-    def upload(self, video):
+    def upload(self, video, title, tags=[]):
         if self.auth_token == None:
             raise VimeoException()
 
@@ -204,4 +204,22 @@ class Vimeo:
             raise VimeoException()
 
         vid = upload_ticket.attrib['video_id']
+
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'video_id' : vid,
+                                       'title' : title,
+                                       'method' : 'vimeo.videos.setTitle'})
+        res = self.do_request(base_url + url)
+
+        if len(tags) > 0:
+            print "tagging %s with %s" %(vid, ",".join(tags))
+            (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                           'auth_token': self.auth_token,
+                                           'video_id' : vid,
+                                           'tags' : ",".join(tags),
+                                           'method': 'vimeo.videos.addTags'})
+            res = self.do_request(base_url + url)
+        
+        
         print vid
