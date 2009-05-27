@@ -18,6 +18,16 @@
 #
 # Author: Marc Poulhiès
 
+"""
+This module is used to interract with Vimeo through its API
+Full documentation is available here:
+ http://vimeo.com/api
+
+This module will be used to upload video. Maybe it will
+get more features as they are needed, but it's not the
+current goal. Of course, any contribution is welcome !
+"""
+
 import curl
 import hashlib
 import xml.etree.ElementTree as ET
