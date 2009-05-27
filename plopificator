@@ -21,6 +21,7 @@
 
 import sys
 import os
+import optparse
 
 import tempfile
 from datetime import datetime,timedelta
@@ -68,27 +69,53 @@ def build_video (file_list, duration, output_filename, fps=25):
     sts = os.waitpid(p.pid, 0)
     os.unlink(flist)
 
+def main(argv):
+    sqldb_file = "/mnt/ft-1/webcam/test.sqlite"
+    sqldb_root = "/mnt/ft-1/webcam"
 
-vimeo_apikey = sys.argv[1]
-vimeo_secret = sys.argv[2]
-vimeo_authtok = sys.argv[3]
+    parser = optparse.OptionParser(
+            usage='Usage: %prog [options]',
+            description="A cloud movi3 generat0r ")
+    parser.add_option('-k', '--vimeo-apikey', metavar='api-key',
+            help='set the "api_key" for vimeo')
+    parser.add_option('-s', '--vimeo-secrey', metavar='api-secret',
+            help='set the "secret" for vimeo')
+    parser.add_option('-t', '--vimeo-authtoken', metavar='authtok',
+            help='set the "auth_token" for vimeo')
+    parser.add_option('-d', '--sqldb-file', metavar='FILE',
+            help='set the sqlite file')
+    parser.add_option('-r', '--sqldb-root', metavar='PATH',
+            help='set the root for relative paths in db')
+    parser.add_option('--delta', metavar='TIME',
+            help='set the time between two sequential beginings') 
+    parser.add_option('-b', '--begin', metavar='DATE',
+            help='set the start date')
+    parser.add_option('-e', '--end', metavar='DATE',
+            help='set the end date')
 
-sq = request.Request("/mnt/ft-1/webcam/test.sqlite","/mnt/ft-1/webcam" )
+    (options, args) = parser.parse_args(argv[1:])
 
-delta = timedelta(1)
-start = datetime(2008,02,02)
+    sq = request.Request(options.sqldb_file, options.sqldb_root)
 
-morning = timedelta(0,0,0,0,0,6)
-full_day = timedelta(0,0,0,0,0,15)
+    delta = timedelta(1)
+    start = datetime(2008,02,02)
 
-today = start
+    morning = timedelta(0,0,0,0,0,6)
+    full_day = timedelta(0,0,0,0,0,15)
 
-v = vimeo.Vimeo(vimeo_apikey, vimeo_secret, vimeo_authtok)
+    today = start
 
-tags = ["Saint Eynard", "nuages", "clouds"]
+    v = vimeo.Vimeo(vimeo_apikey, vimeo_secret, vimeo_authtok)
 
-for i in xrange(20):
-    files = sq.get_files(today+morning, today + morning + full_day)
-    today += delta
-    build_video(files, 120, "/tmp/saint-eynard.avi")
-    v.upload("/tmp/saint-eynard.avi", str(today), tags)
+    tags = ["Saint Eynard", "nuages", "clouds"]
+
+    for i in xrange(20):
+        files = sq.get_files(today+morning, today + morning + full_day)
+        today += delta
+        build_video(files, 120, "/tmp/saint-eynard.avi")
+        v.upload("/tmp/saint-eynard.avi", str(today), tags)
+
+
+if __name__ == '__main__':
+    main(sys.argv)
+ 
