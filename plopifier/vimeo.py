@@ -39,11 +39,11 @@ class VimeoException(Exception):
     pass
 
 class Vimeo:
-    def __init__(self, apikey, apisecret):
+    def __init__(self, apikey, apisecret, auth_token=None):
         self.apikey = apikey
         self.apisecret = apisecret
         self.frob = None
-        self.auth_token = None
+        self.auth_token = auth_token
         self.auth_perms = None
         self.user_dic = None
 
@@ -123,6 +123,7 @@ class Vimeo:
         t = ET.fromstring(res)
 
         self.auth_token = t.findtext("auth/token")
+        print self.auth_token
         self.auth_perms = t.findtext("auth/perms")
         unode = t.find("auth/user")
 
@@ -130,3 +131,77 @@ class Vimeo:
             raise VimeoException()
 
         self.user_dic = unode.attrib
+
+    def test_login(self):
+        if self.auth_token == None:
+            raise VimeoException()
+
+        m = "vimeo.test.login"
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'method' : m})
+        url = base_url + url
+        res = self.do_request(url)
+        t = ET.fromstring(res)
+        un = t.find("user/username")
+
+        if un == None:
+            raise VimeoException()
+        uid = t.find("user").attrib['id']
+
+        print "Username: %s [%s]" % (un.text, uid)
+
+
+    def upload(self, video):
+        if self.auth_token == None:
+            raise VimeoException()
+
+        m = "vimeo.videos.getUploadTicket"
+        (url, sig) = self.get_url_sig({'api_key' : self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'method': m})
+
+        res = self.do_request(base_url + url)
+
+        t = ET.fromstring(res)
+        upload_ticket = t.find("ticket")
+        
+        if upload_ticket == None:
+            raise VimeoException()
+        upload_ticket = upload_ticket.attrib['id']
+        
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'ticket_id': upload_ticket})
+                                       
+
+        c = pycurl.Curl()
+        c.setopt(c.POST, 1)
+        c.setopt(c.URL, "http://vimeo.com/services/upload")
+        c.setopt(c.HTTPPOST, [("video", (c.FORM_FILE, video)),
+                              ("api_key", self.apikey),
+                              ("auth_token", self.auth_token),
+                              ("ticket_id", upload_ticket),
+                              ("api_sig", sig)])
+        c.setopt(c.WRITEFUNCTION, self.body_callback)
+        #c.setopt(c.VERBOSE, 1)
+        self.buf=""
+        c.perform()
+        c.close()
+        #print self.buf
+
+
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'ticket_id': upload_ticket,
+                                       'method' : "vimeo.videos.checkUploadStatus"})
+        url = base_url + url
+        res = self.do_request(url)
+        t = ET.fromstring(res)
+        upload_ticket = t.find("ticket")
+        if upload_ticket == None:
+            print res
+            raise VimeoException()
+
+        vid = upload_ticket.attrib['video_id']
+        print vid
