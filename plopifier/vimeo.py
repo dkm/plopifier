@@ -33,6 +33,25 @@ class Vimeo:
         self.apikey = apikey
         self.apisecret = apisecret
         self.frob = None
+        self.auth_token = None
+        self.auth_perms = None
+        self.user_dic = None
+
+    def get_url_sig(self, dic):
+        tosig = self.apisecret
+        url = "?"
+        keys = dic.keys()
+        keys.sort()
+        for i in keys:
+            tosig+=i + dic[i]
+            url+="%s=%s&" % (i, dic[i])
+
+        m = hashlib.md5()
+        m.update(tosig)
+        sig = str(m.hexdigest())
+        
+        url+="api_sig="+sig
+        return (url, sig)
 
     def getsig(self, method_name):
         m = hashlib.md5()
@@ -45,22 +64,59 @@ class Vimeo:
     def body_callback(self, buf):
         self.buf += buf
 
-    def get_frob_url(self):
-        m = "vimeo.auth.getFrob"
-        u = self.getsig(m)
-        url = base_url + "?api_key=%s&method=%s&api_sig=%s" %(self.apikey,
-                                                              m,u)
+    def do_request(self, url):
+        self.buf = ""
         curl = pycurl.Curl()
         curl.setopt(curl.URL, url)
         curl.setopt(curl.WRITEFUNCTION, self.body_callback)
-        self.buf = ""
         curl.perform()
         curl.close()
+        p = self.buf
+        self.buf = ""
+        return p
 
-        t = ET.fromstring(self.buf)
+    def get_frob_url(self):
+        m = "vimeo.auth.getFrob"
+        (url, u) = self.get_url_sig({'api_key': self.apikey,
+                                     'method' : m})
+        url = base_url + url
+        res = self.do_request(url)
+
+        t = ET.fromstring(res)
         frob = t.find("frob")
 
         if frob == None:
             raise VimeoException()
 
         self.frob = frob.text
+
+    def get_auth_url(self, perms="read"):
+        if self.frob == None:
+            raise VimeoException()
+
+        burl = "http://vimeo.com/services/auth/" 
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'perms' : perms,
+                                       'frob' : self.frob})
+        return burl+url
+        
+    def get_auth_token(self):
+        if self.frob == None:
+            raise VimeoException()
+
+        m = "vimeo.auth.getToken"
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'frob' : self.frob,
+                                       'method': m})
+        url = base_url + url
+        res = self.do_request(url)
+        t = ET.fromstring(res)
+
+        self.auth_token = t.findtext("auth/token")
+        self.auth_perms = t.findtext("auth/perms")
+        unode = t.find("auth/user")
+
+        if None in (self.auth_token, self.auth_perms, unode):
+            raise VimeoException()
+
+        self.user_dic = unode.attrib
