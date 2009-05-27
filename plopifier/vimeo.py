@@ -19,23 +19,48 @@
 # Author: Marc Poulhiès
 
 import curl
+import hashlib
+import xml.etree.ElementTree as ET
+import pycurl
 
+base_url = "http://vimeo.com/api/rest"
+
+class VimeoException(Exception):
+    pass
 
 class Vimeo:
-    def __init__(self, login, pass):
-        pass
+    def __init__(self, apikey, apisecret):
+        self.apikey = apikey
+        self.apisecret = apisecret
+        self.frob = None
 
-    def upload(self, video):
-        self.curl = pycurl.Curl()
-        self.request = Request()
+    def getsig(self, method_name):
+        m = hashlib.md5()
+        l = "%sapi_key%smethod%s" %(self.apisecret, 
+                                    self.apikey, 
+                                    method_name)
+        m.update(l)
+        return m.hexdigest()
 
-        upload_params = {'auth_token' : self.auth_token, 'ticket_id' : self.ticket_id }
-        upload_params['api_sig'] = self.generate_signature(upload_params)
-        upload_params['video'] = open(filepath, 'rb').read
+    def body_callback(self, buf):
+        self.buf += buf
 
-        self.curl.setopt(self.curl.URL, API_UPLOAD_URL)
-        self.curl.setopt(self.curl.POSTFIELDS, urllib.urlencode(upload_params))
-        self.curl.setopt(self.curl.WRITEFUNCTION, self.request.body_callback)
-        self.curl.setopt(self.curl.VERBOSE, 0)
-        self.curl.perform()
-        self.curl.close()
+    def get_frob_url(self):
+        m = "vimeo.auth.getFrob"
+        u = self.getsig(m)
+        url = base_url + "?api_key=%s&method=%s&api_sig=%s" %(self.apikey,
+                                                              m,u)
+        curl = pycurl.Curl()
+        curl.setopt(curl.URL, url)
+        curl.setopt(curl.WRITEFUNCTION, self.body_callback)
+        self.buf = ""
+        curl.perform()
+        curl.close()
+
+        t = ET.fromstring(self.buf)
+        frob = t.find("frob")
+
+        if frob == None:
+            raise VimeoException()
+
+        self.frob = frob.text
