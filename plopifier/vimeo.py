@@ -160,20 +160,8 @@ class Vimeo:
 
 
 
-        c = pycurl.Curl()
-        c.setopt(c.POST, 1)
-        c.setopt(c.URL, base_url)
-        c.setopt(c.HTTPPOST, [("api_key", self.apikey),
-                              ("auth_token", self.auth_token),
-                              ("video_id", video_id),
-                              ('title' , title),
-                              ("api_sig", sig)])
-        #c.setopt(c.VERBOSE, 1)
-        self.buf=""
-        c.perform()
-        c.close()
-        print self.buf
-        #        res = self.do_request(base_url + url)
+        res = self.do_request(base_url + url)
+	print res
 
     def set_tags(self, video_id, tags):
         print "tagging %s with %s" %(video_id, ",".join(tags))
