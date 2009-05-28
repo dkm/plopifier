@@ -110,7 +110,7 @@ def main(argv):
     sq = request.Request(options.sqldb_file, options.sqldb_root)
 
     delta = timedelta(1)
-    start = datetime(2008,02,02)
+    start = datetime(2008,02,16)
 
     morning = timedelta(0,0,0,0,0,6)
     full_day = timedelta(0,0,0,0,0,15)
@@ -121,7 +121,7 @@ def main(argv):
         files = sq.get_files(today+morning, today + morning + full_day)
         today += delta
         build_video(files, 120, "/tmp/saint-eynard.avi")
-        v.upload("/tmp/saint-eynard.avi", today.strftime("%d%m%Y"), tags)
+        v.upload("/tmp/saint-eynard.avi", str(today.strftime("%d%m%Y")), tags)
 
 
 if __name__ == '__main__':
