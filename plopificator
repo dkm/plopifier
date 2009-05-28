@@ -100,7 +100,7 @@ def main(argv):
                     options.vimeo_secret,
                     options.vimeo_authtoken)
 
-    tags = ["Saint Eynard", "nuages", "clouds"]
+    tags = ["SaintEynard", "nuages", "clouds"]
 
     if options.only_upload != None:
        v.upload(options.only_upload, "Forced upload", tags) 
@@ -117,11 +117,11 @@ def main(argv):
 
     today = start
 
-    for i in xrange(1):
+    for i in xrange(20):
         files = sq.get_files(today+morning, today + morning + full_day)
         today += delta
         build_video(files, 120, "/tmp/saint-eynard.avi")
-        v.upload("/tmp/saint-eynard.avi", str(today), tags)
+        v.upload("/tmp/saint-eynard.avi", today.strftime("%d%m%Y"), tags)
 
 
 if __name__ == '__main__':
