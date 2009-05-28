@@ -133,6 +133,16 @@ class Vimeo:
 
         self.user_dic = unode.attrib
 
+    def set_privacy(self, video_id, privacy="anybody"):
+        m="vimeo.videos.setPrivacy"
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'video_id' : video_id,
+                                       'privacy': privacy,
+                                       'method' : m})
+        res = self.do_request(base_url + url)
+        print res
+
     def test_login(self):
         if self.auth_token == None:
             raise VimeoException()
@@ -233,6 +243,7 @@ class Vimeo:
         vid = upload_ticket.attrib['video_id']
 
         self.set_title(vid, title)
+        self.set_privacy(vid)
 
         if len(tags) > 0:
             self.set_tags(vid, tags)
