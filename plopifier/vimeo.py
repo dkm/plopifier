@@ -96,6 +96,7 @@ class Vimeo:
         frob = t.find("frob")
 
         if frob == None:
+            print res
             raise VimeoException()
 
         self.frob = frob.text
@@ -128,6 +129,7 @@ class Vimeo:
         unode = t.find("auth/user")
 
         if None in (self.auth_token, self.auth_perms, unode):
+            print res
             raise VimeoException()
 
         self.user_dic = unode.attrib
@@ -146,6 +148,7 @@ class Vimeo:
         un = t.find("user/username")
 
         if un == None:
+            print res
             raise VimeoException()
         uid = t.find("user").attrib['id']
 
@@ -190,7 +193,9 @@ class Vimeo:
         upload_ticket = t.find("ticket")
         
         if upload_ticket == None:
+            print res
             raise VimeoException()
+
         upload_ticket = upload_ticket.attrib['id']
         
         (url, sig) = self.get_url_sig({'api_key': self.apikey,
