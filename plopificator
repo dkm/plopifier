@@ -37,8 +37,9 @@ from plopifier import request,vimeo
 #  -o saint-eynard-2008-05-04.avi 
 
 def down_sample(list, num):
-    r = int(len(list)/num)
-    return [list[i*r] for i in xrange(num)]
+    r = float(len(list))/float(num)
+
+    return [list[int(i*r)] for i in xrange(num)]
 
 
 def build_video (file_list, duration, output_filename, fps=25):
@@ -47,8 +48,6 @@ def build_video (file_list, duration, output_filename, fps=25):
 
     if len(file_list) > nframe:
         file_list = down_sample(file_list, nframe)
-
-    print "file_list:", len(file_list)
 
     fd,flist = tempfile.mkstemp(prefix="plopificator")
     fh = os.fdopen(fd, "w")
@@ -70,31 +69,44 @@ def build_video (file_list, duration, output_filename, fps=25):
     os.unlink(flist)
 
 def main(argv):
-    sqldb_file = "/mnt/ft-1/webcam/test.sqlite"
-    sqldb_root = "/mnt/ft-1/webcam"
 
     parser = optparse.OptionParser(
-            usage='Usage: %prog [options]',
-            description="A cloud movi3 generat0r ")
+        usage='Usage: %prog [options]',
+        description="A cloud movi3 generat0r ")
     parser.add_option('-k', '--vimeo-apikey', metavar='api-key',
-            help='set the "api_key" for vimeo')
-    parser.add_option('-s', '--vimeo-secrey', metavar='api-secret',
-            help='set the "secret" for vimeo')
+                      help='set the "api_key" for vimeo')
+    parser.add_option('-s', '--vimeo-secret', metavar='api-secret',
+                      help='set the "secret" for vimeo')
     parser.add_option('-t', '--vimeo-authtoken', metavar='authtok',
-            help='set the "auth_token" for vimeo')
+                      help='set the "auth_token" for vimeo')
     parser.add_option('-d', '--sqldb-file', metavar='FILE',
-            help='set the sqlite file')
+                      help='set the sqlite file',
+                      default="/mnt/ft-1/webcam/test.sqlite")
     parser.add_option('-r', '--sqldb-root', metavar='PATH',
-            help='set the root for relative paths in db')
+                      help='set the root for relative paths in db',
+                      default="/mnt/ft-1/webcam")
     parser.add_option('--delta', metavar='TIME',
-            help='set the time between two sequential beginings') 
+                      help='set the time between two sequential beginings') 
     parser.add_option('-b', '--begin', metavar='DATE',
-            help='set the start date')
+                      help='set the start date')
     parser.add_option('-e', '--end', metavar='DATE',
-            help='set the end date')
+                      help='set the end date')
+    parser.add_option('-u', '--only-upload', metavar='FILE',
+                      help='only upload FILE to vimeo')
 
     (options, args) = parser.parse_args(argv[1:])
 
+    v = vimeo.Vimeo(options.vimeo_apikey,
+                    options.vimeo_secret,
+                    options.vimeo_authtoken)
+
+    tags = ["Saint Eynard", "nuages", "clouds"]
+
+    if options.only_upload != None:
+       v.upload(options.only_upload, "Forced upload", tags) 
+       return
+
+    print "use: ", options.sqldb_file, options.sqldb_root
     sq = request.Request(options.sqldb_file, options.sqldb_root)
 
     delta = timedelta(1)
@@ -105,11 +117,7 @@ def main(argv):
 
     today = start
 
-    v = vimeo.Vimeo(vimeo_apikey, vimeo_secret, vimeo_authtok)
-
-    tags = ["Saint Eynard", "nuages", "clouds"]
-
-    for i in xrange(20):
+    for i in xrange(1):
         files = sq.get_files(today+morning, today + morning + full_day)
         today += delta
         build_video(files, 120, "/tmp/saint-eynard.avi")

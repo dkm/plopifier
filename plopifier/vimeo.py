@@ -32,7 +32,7 @@ import curl
 import hashlib
 import xml.etree.ElementTree as ET
 import pycurl
-
+import urllib
 base_url = "http://vimeo.com/api/rest"
 
 class VimeoException(Exception):
@@ -151,6 +151,41 @@ class Vimeo:
 
         print "Username: %s [%s]" % (un.text, uid)
 
+    def set_title(self, video_id, title):
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'video_id' : video_id,
+                                       'title' : title,
+                                       'method' : 'vimeo.videos.setTitle'})
+
+
+
+        c = pycurl.Curl()
+        c.setopt(c.POST, 1)
+        c.setopt(c.URL, base_url)
+        c.setopt(c.HTTPPOST, [("api_key", self.apikey),
+                              ("auth_token", self.auth_token),
+                              ("video_id", video_id),
+                              ('title' , title),
+                              ("api_sig", sig)])
+        #c.setopt(c.VERBOSE, 1)
+        self.buf=""
+        c.perform()
+        c.close()
+        print self.buf
+        #        res = self.do_request(base_url + url)
+
+    def set_tags(self, video_id, tags):
+        print "tagging %s with %s" %(video_id, ",".join(tags))
+        ntags=[urllib.quote_plus(tag) for tag in tags]
+
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'video_id' : video_id,
+                                       'tags' : ",".join(ntags),
+                                       'method': 'vimeo.videos.addTags'})
+        res = self.do_request(base_url + url)
+        print res
 
     def upload(self, video, title, tags=[]):
         if self.auth_token == None:
@@ -205,21 +240,9 @@ class Vimeo:
 
         vid = upload_ticket.attrib['video_id']
 
-        (url, sig) = self.get_url_sig({'api_key': self.apikey,
-                                       'auth_token': self.auth_token,
-                                       'video_id' : vid,
-                                       'title' : title,
-                                       'method' : 'vimeo.videos.setTitle'})
-        res = self.do_request(base_url + url)
+        self.set_title(vid, title)
 
         if len(tags) > 0:
-            print "tagging %s with %s" %(vid, ",".join(tags))
-            (url, sig) = self.get_url_sig({'api_key': self.apikey,
-                                           'auth_token': self.auth_token,
-                                           'video_id' : vid,
-                                           'tags' : ",".join(tags),
-                                           'method': 'vimeo.videos.addTags'})
-            res = self.do_request(base_url + url)
-        
+            self.set_tags(vid, tags)
         
         print vid
