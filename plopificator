@@ -27,6 +27,7 @@ from datetime import datetime,timedelta
 from subprocess import Popen
 
 from plopifier import request,vimeo
+from plopifier.vimeo import VimeoException
 
 #mencoder mf://@filelist.ok 
 #  -mf w=640:h=480:fps=25:type=jpg 
@@ -120,7 +121,12 @@ def main(argv):
         files = sq.get_files(today+morning, today + morning + full_day)
         today += delta
         build_video(files, 120, "/tmp/saint-eynard.avi")
-        v.upload("/tmp/saint-eynard.avi", str(today.strftime("%d%m%Y")), tags)
+
+        try :
+            v.upload("/tmp/saint-eynard.avi", str(today.strftime("%d%m%Y")), tags)
+        except VimeoException, e :
+            print "There was an error with Vimeo:"
+            print e
 
 
 if __name__ == '__main__':

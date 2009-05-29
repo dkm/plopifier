@@ -37,6 +37,44 @@ base_url = "http://vimeo.com/api/rest"
 class VimeoException(Exception):
     pass
 
+class CurlyException(Exception):
+    def __init__(self, code, msg, full):
+        self.code = code
+        self.msg = msg
+        self.full = full
+
+    def __str__(self):
+        return "Error code: %s, message: %s\nFull message: %s" %(self.code, self.msg, self.full)
+
+
+class CurlyRequest:
+    def __init__(self):
+        self.buf = None
+
+    def do_rest_call(self, url):
+        res = self.do_request(url)
+        t = ET.fromstring(res)
+
+        if t.attrib['stat'] == 'fail':
+            err_code = t.find('err').attrib['code']
+            err_msg = t.find('err').attrib['msg']
+            raise CurlyException(err_code, err_msg, ET.tostring(t))
+        return t
+
+    def body_callback(self, buf):
+        self.buf += buf
+
+    def do_request(self, url):
+        self.buf = ""
+        curl = pycurl.Curl()
+        curl.setopt(curl.URL, url)
+        curl.setopt(curl.WRITEFUNCTION, self.body_callback)
+        curl.perform()
+        curl.close()
+        p = self.buf
+        self.buf = ""
+        return p
+
 class Vimeo:
     def __init__(self, apikey, apisecret, auth_token=None):
         self.apikey = apikey
@@ -45,6 +83,7 @@ class Vimeo:
         self.auth_token = auth_token
         self.auth_perms = None
         self.user_dic = None
+        self.curly = CurlyRequest()
 
     def get_url_sig(self, dic):
         tosig = self.apisecret
@@ -70,32 +109,17 @@ class Vimeo:
         m.update(l)
         return m.hexdigest()
 
-    def body_callback(self, buf):
-        self.buf += buf
-
-    def do_request(self, url):
-        self.buf = ""
-        curl = pycurl.Curl()
-        curl.setopt(curl.URL, url)
-        curl.setopt(curl.WRITEFUNCTION, self.body_callback)
-        curl.perform()
-        curl.close()
-        p = self.buf
-        self.buf = ""
-        return p
 
     def get_frob_url(self):
         m = "vimeo.auth.getFrob"
         (url, u) = self.get_url_sig({'api_key': self.apikey,
                                      'method' : m})
         url = base_url + url
-        res = self.do_request(url)
+        t = self.curly.do_rest_call(url)
 
-        t = ET.fromstring(res)
         frob = t.find("frob")
 
         if frob == None:
-            print res
             raise VimeoException()
 
         self.frob = frob.text
@@ -119,8 +143,7 @@ class Vimeo:
                                        'frob' : self.frob,
                                        'method': m})
         url = base_url + url
-        res = self.do_request(url)
-        t = ET.fromstring(res)
+        t = self.curly.do_request(url)
 
         self.auth_token = t.findtext("auth/token")
         print self.auth_token
@@ -128,7 +151,6 @@ class Vimeo:
         unode = t.find("auth/user")
 
         if None in (self.auth_token, self.auth_perms, unode):
-            print res
             raise VimeoException()
 
         self.user_dic = unode.attrib
@@ -140,8 +162,8 @@ class Vimeo:
                                        'video_id' : video_id,
                                        'privacy': privacy,
                                        'method' : m})
-        res = self.do_request(base_url + url)
-        print res
+        t = self.curly.do_rest_call(base_url + url)
+
 
     def test_login(self):
         if self.auth_token == None:
@@ -152,12 +174,10 @@ class Vimeo:
                                        'auth_token': self.auth_token,
                                        'method' : m})
         url = base_url + url
-        res = self.do_request(url)
-        t = ET.fromstring(res)
+        t = self.curly.do_rest_call(url)
         un = t.find("user/username")
 
         if un == None:
-            print res
             raise VimeoException()
         uid = t.find("user").attrib['id']
 
@@ -172,8 +192,8 @@ class Vimeo:
 
 
 
-        res = self.do_request(base_url + url)
-	print res
+        t = self.curly.do_rest_call(base_url + url)
+
 
     def set_tags(self, video_id, tags):
         print "tagging %s with %s" %(video_id, ",".join(tags))
@@ -184,8 +204,8 @@ class Vimeo:
                                        'video_id' : video_id,
                                        'tags' : ",".join(ntags),
                                        'method': 'vimeo.videos.addTags'})
-        res = self.do_request(base_url + url)
-        print res
+        t = self.curly.do_rest_call(base_url + url)
+
 
     def upload(self, video, title, tags=[]):
         if self.auth_token == None:
@@ -196,13 +216,13 @@ class Vimeo:
                                        'auth_token': self.auth_token,
                                        'method': m})
 
-        res = self.do_request(base_url + url)
+        t = self.curly.do_rest_call(base_url + url)
 
-        t = ET.fromstring(res)
         upload_ticket = t.find("ticket")
         
         if upload_ticket == None:
-            print res
+            print t.attrib
+            print t.find('err').attrib
             raise VimeoException()
 
         upload_ticket = upload_ticket.attrib['id']
@@ -233,11 +253,10 @@ class Vimeo:
                                        'ticket_id': upload_ticket,
                                        'method' : "vimeo.videos.checkUploadStatus"})
         url = base_url + url
-        res = self.do_request(url)
-        t = ET.fromstring(res)
+        t = self.curly.do_rest_call(url)
+
         upload_ticket = t.find("ticket")
         if upload_ticket == None:
-            print res
             raise VimeoException()
 
         vid = upload_ticket.attrib['video_id']
