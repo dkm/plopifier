@@ -27,7 +27,7 @@ from datetime import datetime,timedelta
 from subprocess import Popen
 
 from plopifier import request,vimeo
-from plopifier.vimeo import VimeoException
+from plopifier.vimeo import VimeoException, CurlyException
 
 #mencoder mf://@filelist.ok 
 #  -mf w=640:h=480:fps=25:type=jpg 
@@ -79,6 +79,9 @@ def main(argv):
                       help='set the "secret" for vimeo')
     parser.add_option('-t', '--vimeo-authtoken', metavar='authtok',
                       help='set the "auth_token" for vimeo')
+    parser.add_option('--vimeo-testticket',
+                      action="store_true", default=False,
+                      help='simply tests if an upload ticket can be acquired')
     parser.add_option('-d', '--sqldb-file', metavar='FILE',
                       help='set the sqlite file',
                       default="/mnt/ft-1/webcam/test.sqlite")
@@ -101,6 +104,16 @@ def main(argv):
                     options.vimeo_authtoken)
 
     tags = ["SaintEynard", "nuages", "clouds"]
+
+
+    if options.vimeo_testticket:
+        try:
+            v.get_upload_ticket()
+        except CurlyException,e:
+            print "Looks like we can't get an upload ticket. The reason is:"
+            print "%s - %s" %(e.code, e.msg)
+            return -1
+        
 
     if options.only_upload != None:
        v.upload(options.only_upload, "Forced upload", tags) 

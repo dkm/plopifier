@@ -206,8 +206,8 @@ class Vimeo:
                                        'method': 'vimeo.videos.addTags'})
         t = self.curly.do_rest_call(base_url + url)
 
-
-    def upload(self, video, title, tags=[]):
+        
+    def get_upload_ticket(self):
         if self.auth_token == None:
             raise VimeoException()
 
@@ -226,6 +226,13 @@ class Vimeo:
             raise VimeoException()
 
         upload_ticket = upload_ticket.attrib['id']
+        return upload_ticket
+
+    def upload(self, video, title, tags=[]):
+        if self.auth_token == None:
+            raise VimeoException()
+
+        upload_ticket = self.get_upload_ticket()
         
         (url, sig) = self.get_url_sig({'api_key': self.apikey,
                                        'auth_token': self.auth_token,
