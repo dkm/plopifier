@@ -134,7 +134,6 @@ def main(argv):
 
     for i in xrange(20):
         files = sq.get_files(today+morning, today + morning + full_day)
-        today += delta
         build_video(files, 120, "/tmp/saint-eynard.avi")
 
         try :
@@ -142,6 +141,7 @@ def main(argv):
         except VimeoException, e :
             print "There was an error with Vimeo:"
             print e
+        today += delta
 
 
 if __name__ == '__main__':
