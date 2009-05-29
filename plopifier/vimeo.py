@@ -75,6 +75,20 @@ class CurlyRequest:
         self.buf = ""
         return p
 
+    def do_post(self, url, args):
+        c = pycurl.Curl()
+        c.setopt(c.POST, 1)
+        c.setopt(c.URL, url)
+        c.setopt(c.HTTPPOST, args)
+        c.setopt(c.WRITEFUNCTION, self.body_callback)
+        #c.setopt(c.VERBOSE, 1)
+        self.buf=""
+        c.perform()
+        c.close()
+        res = self.buf
+        self.buf = ""
+        return res
+
 class Vimeo:
     def __init__(self, apikey, apisecret, auth_token=None):
         self.apikey = apikey
@@ -237,23 +251,13 @@ class Vimeo:
         (url, sig) = self.get_url_sig({'api_key': self.apikey,
                                        'auth_token': self.auth_token,
                                        'ticket_id': upload_ticket})
-                                       
 
-        c = pycurl.Curl()
-        c.setopt(c.POST, 1)
-        c.setopt(c.URL, "http://vimeo.com/services/upload")
-        c.setopt(c.HTTPPOST, [("video", (c.FORM_FILE, video)),
-                              ("api_key", self.apikey),
-                              ("auth_token", self.auth_token),
-                              ("ticket_id", upload_ticket),
-                              ("api_sig", sig)])
-        c.setopt(c.WRITEFUNCTION, self.body_callback)
-        #c.setopt(c.VERBOSE, 1)
-        self.buf=""
-        c.perform()
-        c.close()
-        #print self.buf
-
+        res = self.curly.do_post("http://vimeo.com/services/upload",
+                                 [("video", (pycurl.FORM_FILE, video)),
+                                  ("api_key", self.apikey),
+                                  ("auth_token", self.auth_token),
+                                  ("ticket_id", upload_ticket),
+                                  ("api_sig", sig)])
 
         (url, sig) = self.get_url_sig({'api_key': self.apikey,
                                        'auth_token': self.auth_token,
