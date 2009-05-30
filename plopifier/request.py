@@ -17,8 +17,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Plopifier.  If not, see <http://www.gnu.org/licenses/>.
 
+"""
+This modules provides high level method to access
+the images from the database.
+"""
+
 from pysqlite2 import dbapi2 as sqlite
-from datetime import datetime
+#from datetime import datetime
 import os.path
 
 class Request:
@@ -29,13 +34,20 @@ class Request:
         self.absroot = absroot
 
     def get_files(self, start, stop):
-        q = "SELECT rootfs,relpath FROM images,repository WHERE ddate >= '%s' AND ddate <= '%s' ORDER BY ddate" %(start, stop)
+        q = "SELECT rootfs,relpath FROM images,repository" +\
+            " WHERE ddate >= '%s' AND ddate <= '%s'" + \
+            " ORDER BY ddate" % (start, stop)
         print q
         self.cur.execute(q)
         if self.absroot != None:
-            return [os.path.abspath("%s/%s/%s" %(self.absroot, x[0], x[1])) for x in self.cur.fetchall()]
+            return [os.path.abspath("%s/%s/%s" % (self.absroot, 
+                                                  x[0], 
+                                                  x[1])) 
+                    for x in self.cur.fetchall()]
         else:
-            return [os.path.abspath("/%s/%s" %(x[0], x[1])) for x in self.cur.fetchall()]
+            return [os.path.abspath("/%s/%s" % (x[0], 
+                                                x[1])) 
+                    for x in self.cur.fetchall()]
 
     def __del__(self):
         self.cnx.close()

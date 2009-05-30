@@ -27,24 +27,32 @@ get more features as they are needed, but it's not the
 current goal. Of course, any contribution is welcome !
 """
 
-import curl
+##import curl
 import hashlib
 import xml.etree.ElementTree as ET
 import pycurl
 import urllib
-base_url = "http://vimeo.com/api/rest"
+BASE_URL = "http://vimeo.com/api/rest"
 
 class VimeoException(Exception):
-    pass
+    def __init__(self, msg):
+        Exception.__init__(self)
+        self.msg = msg
+    
+    def __str__(self):
+        return self.msg
 
-class CurlyException(Exception):
+class CurlyRestException(Exception):
     def __init__(self, code, msg, full):
+        Exception.__init__(self)
         self.code = code
         self.msg = msg
         self.full = full
 
     def __str__(self):
-        return "Error code: %s, message: %s\nFull message: %s" %(self.code, self.msg, self.full)
+        return "Error code: %s, message: %s\nFull message: %s" % (self.code, 
+                                                                  self.msg, 
+                                                                  self.full)
 
 
 class CurlyRequest:
@@ -58,7 +66,7 @@ class CurlyRequest:
         if t.attrib['stat'] == 'fail':
             err_code = t.find('err').attrib['code']
             err_msg = t.find('err').attrib['msg']
-            raise CurlyException(err_code, err_msg, ET.tostring(t))
+            raise CurlyRestException(err_code, err_msg, ET.tostring(t))
         return t
 
     def body_callback(self, buf):
@@ -75,14 +83,14 @@ class CurlyRequest:
         self.buf = ""
         return p
 
-    def do_post(self, url, args):
+    def do_post_call(self, url, args):
         c = pycurl.Curl()
         c.setopt(c.POST, 1)
         c.setopt(c.URL, url)
-        c.setopt(c.HTTPPOST, args)
+        c.setopt(c.HTTPPOST, )
         c.setopt(c.WRITEFUNCTION, self.body_callback)
         #c.setopt(c.VERBOSE, 1)
-        self.buf=""
+        self.buf = ""
         c.perform()
         c.close()
         res = self.buf
@@ -125,38 +133,23 @@ class Vimeo:
         keys = dic.keys()
         keys.sort()
         for i in keys:
-            tosig+=i + dic[i]
-            url+="%s=%s&" % (i, dic[i])
+            tosig += i + dic[i]
+            url += "%s=%s&" % (i, dic[i])
 
         m = hashlib.md5()
         m.update(tosig)
         sig = str(m.hexdigest())
         
-        url+="api_sig="+sig
+        url += "api_sig="+sig
         return (url, sig)
 
     def getsig(self, method_name):
         m = hashlib.md5()
-        l = "%sapi_key%smethod%s" %(self.apisecret, 
-                                    self.apikey, 
-                                    method_name)
+        l = "%sapi_key%smethod%s" % (self.apisecret, 
+                                     self.apikey, 
+                                     method_name)
         m.update(l)
         return m.hexdigest()
-
-
-    def get_frob_url(self):
-        m = "vimeo.auth.getFrob"
-        (url, u) = self.get_url_sig({'api_key': self.apikey,
-                                     'method' : m})
-        url = base_url + url
-        t = self.curly.do_rest_call(url)
-
-        frob = t.find("frob")
-
-        if frob == None:
-            raise VimeoException()
-
-        self.frob = frob.text
 
     def get_auth_url(self, perms="read"):
         if self.frob == None:
@@ -167,130 +160,18 @@ class Vimeo:
                                        'perms' : perms,
                                        'frob' : self.frob})
         return burl+url
-        
-    def get_auth_token(self):
-        if self.frob == None:
-            raise VimeoException()
-
-        m = "vimeo.auth.getToken"
-        (url, sig) = self.get_url_sig({'api_key': self.apikey,
-                                       'frob' : self.frob,
-                                       'method': m})
-        url = base_url + url
-        t = self.curly.do_request(url)
-
-        self.auth_token = t.findtext("auth/token")
-        print self.auth_token
-        self.auth_perms = t.findtext("auth/perms")
-        unode = t.find("auth/user")
-
-        if None in (self.auth_token, self.auth_perms, unode):
-            raise VimeoException()
-
-        self.user_dic = unode.attrib
-
-    def set_privacy(self, video_id, privacy="anybody"):
-        m="vimeo.videos.setPrivacy"
-        (url, sig) = self.get_url_sig({'api_key': self.apikey,
-                                       'auth_token': self.auth_token,
-                                       'video_id' : video_id,
-                                       'privacy': privacy,
-                                       'method' : m})
-        t = self.curly.do_rest_call(base_url + url)
 
 
-    def test_login(self):
+    def do_upload(self, video, title, tags=[]):
         if self.auth_token == None:
             raise VimeoException()
 
-        m = "vimeo.test.login"
-        (url, sig) = self.get_url_sig({'api_key': self.apikey,
-                                       'auth_token': self.auth_token,
-                                       'method' : m})
-        url = base_url + url
-        t = self.curly.do_rest_call(url)
-        un = t.find("user/username")
 
-        if un == None:
-            raise VimeoException()
-        uid = t.find("user").attrib['id']
+        upload_ticket = self.videos_getUploadTicket()
 
-        print "Username: %s [%s]" % (un.text, uid)
+        self.upload(video, upload_ticket)
 
-    def set_title(self, video_id, title):
-        (url, sig) = self.get_url_sig({'api_key': self.apikey,
-                                       'auth_token': self.auth_token,
-                                       'video_id' : video_id,
-                                       'title' : title,
-                                       'method' : 'vimeo.videos.setTitle'})
-
-
-
-        t = self.curly.do_rest_call(base_url + url)
-
-
-    def set_tags(self, video_id, tags):
-        print "tagging %s with %s" %(video_id, ",".join(tags))
-        ntags=[urllib.quote_plus(tag) for tag in tags]
-
-        (url, sig) = self.get_url_sig({'api_key': self.apikey,
-                                       'auth_token': self.auth_token,
-                                       'video_id' : video_id,
-                                       'tags' : ",".join(ntags),
-                                       'method': 'vimeo.videos.addTags'})
-        t = self.curly.do_rest_call(base_url + url)
-
-        
-    def get_upload_ticket(self):
-        if self.auth_token == None:
-            raise VimeoException()
-
-        m = "vimeo.videos.getUploadTicket"
-        (url, sig) = self.get_url_sig({'api_key' : self.apikey,
-                                       'auth_token': self.auth_token,
-                                       'method': m})
-
-        t = self.curly.do_rest_call(base_url + url)
-
-        upload_ticket = t.find("ticket")
-        
-        if upload_ticket == None:
-            print t.attrib
-            print t.find('err').attrib
-            raise VimeoException()
-
-        upload_ticket = upload_ticket.attrib['id']
-        return upload_ticket
-
-    def upload(self, video, title, tags=[]):
-        if self.auth_token == None:
-            raise VimeoException()
-
-        upload_ticket = self.get_upload_ticket()
-        
-        (url, sig) = self.get_url_sig({'api_key': self.apikey,
-                                       'auth_token': self.auth_token,
-                                       'ticket_id': upload_ticket})
-
-        res = self.curly.do_post("http://vimeo.com/services/upload",
-                                 [("video", (pycurl.FORM_FILE, video)),
-                                  ("api_key", self.apikey),
-                                  ("auth_token", self.auth_token),
-                                  ("ticket_id", upload_ticket),
-                                  ("api_sig", sig)])
-
-        (url, sig) = self.get_url_sig({'api_key': self.apikey,
-                                       'auth_token': self.auth_token,
-                                       'ticket_id': upload_ticket,
-                                       'method' : "vimeo.videos.checkUploadStatus"})
-        url = base_url + url
-        t = self.curly.do_rest_call(url)
-
-        upload_ticket = t.find("ticket")
-        if upload_ticket == None:
-            raise VimeoException()
-
-        vid = upload_ticket.attrib['video_id']
+        vid = self.videos_checkUploadStatus(upload_ticket)
 
         # this is a workaround for a bug in vimeo API
         # sometimes, after a video is uploaded
@@ -298,15 +179,327 @@ class Vimeo:
         # some delays somewhere... so put failed tries
         # in a queue, that should be treated later
         try :
-            self.set_title(vid, title)
-            self.set_privacy(vid)
+            self.videos_setTitle(vid, title)
+            self.videos_setPrivacy(vid)
 
             if len(tags) > 0:
-                self.set_tags(vid, tags)
+                self.videos_addTags(vid, tags)
         except CurlyException,e:
             print "Failed to change metadata for video ", vid
             print "queuing for later..."
             self.vimeo_bug_queue.append((vid, title, tags))
-
         
         print vid
+
+    #
+    # Follows the API implementation itself.
+    #
+    def auth_getFrob(self):
+        m = "vimeo.auth.getFrob"
+        (url, u) = self.get_url_sig({'api_key': self.apikey,
+                                     'method' : m})
+        url = BASE_URL + url
+        t = self.curly.do_rest_call(url)
+
+        frob = t.find("frob")
+
+        if frob == None:
+            raise VimeoException()
+
+        self.frob = frob.text
+
+        
+    def auth_getToken(self):
+        if self.frob == None:
+            msg = "Missing frob for getting authentication ticket!"
+            raise VimeoException(msg)
+
+        m = "vimeo.auth.getToken"
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'frob' : self.frob,
+                                       'method': m})
+        url = BASE_URL + url
+        t = self.curly.do_rest_call(url)
+
+        self.auth_token = t.findtext("auth/token")
+        print self.auth_token
+        self.auth_perms = t.findtext("auth/perms")
+        unode = t.find("auth/user")
+
+        if None in (self.auth_token, self.auth_perms, unode):
+            raise VimeoException("Could not get token for frob " + self.frob)
+
+        self.user_dic = unode.attrib
+
+    def videos_setPrivacy(self, video_id, privacy="anybody"):
+        m = "vimeo.videos.setPrivacy"
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'video_id' : video_id,
+                                       'privacy': privacy,
+                                       'method' : m})
+        t = self.curly.do_rest_call(BASE_URL + url)
+
+
+    def test_login(self):
+        if self.auth_token == None:
+            raise VimeoException("Missing authentication token!")
+
+        m = "vimeo.test.login"
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'method' : m})
+        url = BASE_URL + url
+        t = self.curly.do_rest_call(url)
+        un = t.find("user/username")
+
+        if un == None:
+            raise VimeoException("Invalid response from server !")
+
+        uid = t.find("user").attrib['id']
+
+        print "Username: %s [%s]" % (un.text, uid)
+
+    def videos_setTitle(self, video_id, title):
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'video_id' : video_id,
+                                       'title' : title,
+                                       'method' : 'vimeo.videos.setTitle'})
+
+        t = self.curly.do_rest_call(BASE_URL + url)
+
+
+    def videos_addTags(self, video_id, tags):
+        print "tagging %s with %s" % (video_id, ",".join(tags))
+        ntags = [urllib.quote_plus(tag) for tag in tags]
+
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'video_id' : video_id,
+                                       'tags' : ",".join(ntags),
+                                       'method': 'vimeo.videos.addTags'})
+        t = self.curly.do_rest_call(BASE_URL + url)
+
+        
+    def videos_getUploadTicket(self):
+        if self.auth_token == None:
+            raise VimeoException("Missing authentication token!")
+
+        m = "vimeo.videos.getUploadTicket"
+        (url, sig) = self.get_url_sig({'api_key' : self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'method': m})
+
+        t = self.curly.do_rest_call(BASE_URL + url)
+
+        upload_ticket = t.find("ticket")
+        
+        if upload_ticket == None:
+            print t.attrib
+            print t.find('err').attrib
+            raise VimeoException("Invalid response from server!")
+
+        upload_ticket = upload_ticket.attrib['id']
+        return upload_ticket
+    
+    def videos_checkUploadStatus(self, ticket):
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'ticket_id': upload_ticket,
+                                       'method' : "vimeo.videos.checkUploadStatus"})
+        url = BASE_URL + url
+        t = self.curly.do_rest_call(url)
+
+        upload_ticket = t.find("ticket")
+
+        if upload_ticket == None or 'video_id' not in upload_ticket.attrib:
+            raise VimeoException("Invalid response from server!")
+
+        return upload_ticket.attrib['video_id']
+        
+    def upload(self, video_file, ticket):
+        (url, sig) = self.get_url_sig({'api_key': self.apikey,
+                                       'auth_token': self.auth_token,
+                                       'ticket_id': ticket})
+
+        res = self.curly.do_post_call("http://vimeo.com/services/upload",
+                                      [("video", (pycurl.FORM_FILE, video_file)),
+                                       ("api_key", self.apikey),
+                                       ("auth_token", self.auth_token),
+                                       ("ticket_id", ticket),
+                                       ("api_sig", sig)])
+        # the API does not provide any return value
+        # for the POST.
+    
+    def test_echo(self, dic_args):
+        pass
+# vimeo.test.echo
+# This will just repeat back any parameters that you send.
+# Authentication
+# Authentication is not required.
+# Returns
+
+# <foo>bar</foo>
+# <some_string>Hi-Ya!</some_strong>
+
+    def test_null(self):
+        pass
+# vimeo.test.null
+# This is just a simple null/ping test...
+# Authentication
+# Authentication is required with 'read' permission.
+# Returns
+# This method returns an empty success response.
+
+# <rsp stat="ok"></rsp>
+
+    def auth_checkToken(self):
+        pass
+#     vimeo.auth.checkToken
+# Checks the validity of the token. Returns the user associated with it.
+# Returns the same as vimeo.auth.getToken
+# Authentication
+# Authentication is not required.
+# Parameters
+
+#     * string auth_token - - Just send the auth token
+
+# Returns
+
+# <auth>
+#    <token>12354</token>
+#    <perms>write</perms>
+#    <user id="151542" username="ted" fullname="Ted!" />
+# </auth>
+
+# Error Codes
+
+#     * 98: Login failed / Invalid auth token
+
+    def videos_getList(self, userid, page, per_page):
+        pass
+# vimeo.videos.getList
+# This gets a list of videos for the specified user.
+
+# This is the functionality of "My Videos" or "Ted's Videos."
+
+# At the moment, this is the same list as vimeo.videos.getAppearsInList. If you need uploaded or appears in, those are available too.
+# Authentication
+# Authentication is not required.
+# Parameters
+
+#     * string user_id - User ID, this can be the ID number (151542) or the username (ted)
+#     * int page - Which page to show.
+#     * int per_page - How many results per page?
+
+# Returns
+# The default response is this:
+
+# <videos page="1" perpage="25" on_this_page="2">
+# 	<video id="173727" owner="151542" title="At the beach" privacy="users" is_hd="0" />
+# 	<video id="173726" owner="151542" title="The Kids" privacy="contacts" is_hd="0" />
+# </videos>
+
+# If you pass fullResponse=1 as a parameter, the video object is identical to the vimeo.videos.getInfo call. 
+
+    def videos_getUploadList(self, user_id, page, per_page):
+        pass
+#     vimeo.videos.getUploadedList
+# This gets a list of videos uploaded by the specified user.
+
+# If the calling user is logged in, this will return information that calling user has access to (including private videos). If the calling user is not authenticated, this will only return public information, or a permission denied error if none is available.
+# Authentication
+# Authentication is not required.
+# Parameters
+
+#     * string user_id - User ID, this can be the ID number (151542) or the username (ted)
+#     * int page - Which page to show.
+#     * int per_page - How many results per page?
+
+# Returns
+# The default response is this:
+
+# <videos page="1" perpage="25" on_this_page="2">
+# 	<video id="173727" owner="151542" title="At the beach" privacy="users" is_hd="0" />
+# 	<video id="173726" owner="151542" title="The Kids" privacy="contacts" is_hd="0" />
+# </videos>
+
+# If you pass fullResponse=1 as a parameter, the video object is identical to the vimeo.videos.getInfo call. 
+
+    def videos_getAppearsInList(self, user_id, page, per_page):
+        pass
+# vimeo.videos.getAppearsInList
+# This gets a list of videos that the specified user appears in.
+
+# If the calling user is logged in, this will return information that calling user has access to (including private videos). If the calling user is not authenticated, this will only return public information, or a permission denied error if none is available.
+# Authentication
+# Authentication is not required.
+# Parameters
+
+#     * string user_id - User ID, this can be the ID number (151542) or the username (ted)
+#     * int page - Which page to show.
+#     * int per_page - How many results per page?
+
+# Returns
+# The default response is this:
+
+# <videos page="1" perpage="25" on_this_page="2">
+# 	<video id="173727" owner="151542" title="At the beach" privacy="users" is_hd="0" />
+# 	<video id="173726" owner="151542" title="The Kids" privacy="contacts" is_hd="0" />
+# </videos>
+
+# If you pass fullResponse=1 as a parameter, the video object is identical to the vimeo.videos.getInfo call. 
+
+    def videos_getSubscriptionsList(self, user_id, page, per_page):
+        pass
+ #    vimeo.videos.getSubscriptionsList
+# This gets a list of subscribed videos for a particular user.
+
+# If the calling user is logged in, this will return information that calling user has access to (including private videos). If the calling user is not authenticated, this will only return public information, or a permission denied error if none is available.
+# Authentication
+# Authentication is not required.
+# Parameters
+
+#     * string user_id - User ID, this can be the ID number (151542) or the username (ted) %user_default%
+#     * int page - Which page to show.
+#     * int per_page - How many results per page?
+
+# Returns
+# The default response is this:
+
+# <videos page="1" perpage="25" on_this_page="2">
+# 	<video id="173727" owner="151542" title="At the beach" privacy="users" is_hd="0" />
+# 	<video id="173726" owner="151542" title="The Kids" privacy="contacts" is_hd="0" />
+# </videos>
+
+# If you pass fullResponse=1 as a parameter, the video object is identical to the vimeo.videos.getInfo call. 
+
+    def videos_getListByTag(self, tag, user_id, page, per_page):
+        pass
+#     vimeo.videos.getListByTag
+# This gets a list of videos by tag
+
+# If you specify a user_id, we'll only get video uploaded by that user
+# with the specified tag.
+
+# If the calling user is logged in, this will return information that calling user has access to (including private videos). If the calling user is not authenticated, this will only return public information, or a permission denied error if none is available.
+# Authentication
+# Authentication is not required.
+# Parameters
+
+#     * string tag (required) - A single tag: "cat" "new york" "cheese"
+#     * string user_id - User ID, this can be the ID number (151542) or the username (ted) %user_default%
+#     * int page - Which page to show.
+#     * int per_page - How many results per page?
+
+# Returns
+# The default response is this:
+
+# <videos page="1" perpage="25" on_this_page="2">
+# 	<video id="173727" owner="151542" title="At the beach" privacy="users" is_hd="0" />
+# 	<video id="173726" owner="151542" title="The Kids" privacy="contacts" is_hd="0" />
+# </videos>
+
+# If you pass fullResponse=1 as a parameter, the video object is identical to the vimeo.videos.getInfo call. 
+>>
