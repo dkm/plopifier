@@ -108,7 +108,7 @@ def main(argv):
 
     if options.vimeo_testticket:
         try:
-            v.get_upload_ticket()
+            v.videos_getUploadTicket()
             print "Ticket acquired, user can upload video"
             return 0
         except CurlyRestException,e:
