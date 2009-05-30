@@ -122,7 +122,7 @@ class Vimeo:
                 if len(tags) > 0:
                     self.set_tags(vid, tags)
                 ok.append(i)
-            except CurlyException,e:
+            except CurlyRestException,e:
                 print "Still failing for video ", vid
         for i in ok:
             self.vimeo_bug_queue.remove(i)
@@ -184,7 +184,7 @@ class Vimeo:
 
             if len(tags) > 0:
                 self.videos_addTags(vid, tags)
-        except CurlyException,e:
+        except CurlyRestException,e:
             print "Failed to change metadata for video ", vid
             print "queuing for later..."
             self.vimeo_bug_queue.append((vid, title, tags))
