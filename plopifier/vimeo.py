@@ -502,4 +502,3 @@ class Vimeo:
 # </videos>
 
 # If you pass fullResponse=1 as a parameter, the video object is identical to the vimeo.videos.getInfo call. 
->>

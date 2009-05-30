@@ -27,7 +27,7 @@ from datetime import datetime,timedelta
 from subprocess import Popen
 
 from plopifier import request,vimeo
-from plopifier.vimeo import VimeoException, CurlyException
+from plopifier.vimeo import VimeoException, CurlyRestException
 
 #mencoder mf://@filelist.ok 
 #  -mf w=640:h=480:fps=25:type=jpg 
@@ -111,7 +111,7 @@ def main(argv):
             v.get_upload_ticket()
             print "Ticket acquired, user can upload video"
             return 0
-        except CurlyException,e:
+        except CurlyRestException,e:
             print "Looks like we can't get an upload ticket. The reason is:"
             print "%s - %s" %(e.code, e.msg)
             return -1
