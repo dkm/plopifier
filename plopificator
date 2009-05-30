@@ -103,7 +103,7 @@ def main(argv):
                     options.vimeo_secret,
                     options.vimeo_authtoken)
 
-    tags = ["SaintEynard", "nuages", "clouds"]
+    tags = ["SaintEynard", "nuages", "clouds", "timelapse"]
 
 
     if options.vimeo_testticket:
