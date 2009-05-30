@@ -125,7 +125,7 @@ def main(argv):
     sq = request.Request(options.sqldb_file, options.sqldb_root)
 
     delta = timedelta(1)
-    start = datetime(2007,3,9)
+    start = datetime(2007,3,20)
 
     morning = timedelta(0,0,0,0,0,6)
     full_day = timedelta(0,0,0,0,0,15)
@@ -142,6 +142,7 @@ def main(argv):
             print "There was an error with Vimeo:"
             print e
         today += delta
+        v.process_bug_queue()
 
 
 if __name__ == '__main__':
