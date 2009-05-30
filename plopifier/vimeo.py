@@ -98,6 +98,26 @@ class Vimeo:
         self.auth_perms = None
         self.user_dic = None
         self.curly = CurlyRequest()
+        self.vimeo_bug_queue = []
+
+    def process_bug_queue(self):
+        ok = []
+
+        for i in self.vimeo_bug_queue:
+            vid = i[0]
+            title = i[2]
+            tags = i[3]
+            try :
+                self.set_title(vid, title)
+                self.set_privacy(vid)
+
+                if len(tags) > 0:
+                    self.set_tags(vid, tags)
+                ok.append(i)
+            except CurlyException,e:
+                print "Still failing for video ", vid
+        for i in ok:
+            self.vimeo_bug_queue.remove(i)
 
     def get_url_sig(self, dic):
         tosig = self.apisecret
@@ -272,10 +292,21 @@ class Vimeo:
 
         vid = upload_ticket.attrib['video_id']
 
-        self.set_title(vid, title)
-        self.set_privacy(vid)
+        # this is a workaround for a bug in vimeo API
+        # sometimes, after a video is uploaded
+        # changing meta data fails... there must be
+        # some delays somewhere... so put failed tries
+        # in a queue, that should be treated later
+        try :
+            self.set_title(vid, title)
+            self.set_privacy(vid)
 
-        if len(tags) > 0:
-            self.set_tags(vid, tags)
+            if len(tags) > 0:
+                self.set_tags(vid, tags)
+        except CurlyException,e:
+            print "Failed to change metadata for video ", vid
+            print "queuing for later..."
+            self.vimeo_bug_queue.append((vid, title, tags))
+
         
         print vid
