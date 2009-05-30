@@ -306,7 +306,7 @@ class Vimeo:
     def videos_checkUploadStatus(self, ticket):
         (url, sig) = self.get_url_sig({'api_key': self.apikey,
                                        'auth_token': self.auth_token,
-                                       'ticket_id': upload_ticket,
+                                       'ticket_id': ticket,
                                        'method' : "vimeo.videos.checkUploadStatus"})
         url = BASE_URL + url
         t = self.curly.do_rest_call(url)
