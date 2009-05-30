@@ -113,8 +113,8 @@ class Vimeo:
 
         for i in self.vimeo_bug_queue:
             vid = i[0]
-            title = i[2]
-            tags = i[3]
+            title = i[1]
+            tags = i[2]
             try :
                 self.set_title(vid, title)
                 self.set_privacy(vid)
