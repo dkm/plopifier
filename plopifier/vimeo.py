@@ -87,7 +87,7 @@ class CurlyRequest:
         c = pycurl.Curl()
         c.setopt(c.POST, 1)
         c.setopt(c.URL, url)
-        c.setopt(c.HTTPPOST, )
+        c.setopt(c.HTTPPOST, args)
         c.setopt(c.WRITEFUNCTION, self.body_callback)
         #c.setopt(c.VERBOSE, 1)
         self.buf = ""
