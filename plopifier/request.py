@@ -35,8 +35,8 @@ class Request:
 
     def get_files(self, start, stop):
         q = "SELECT rootfs,relpath FROM images,repository" +\
-            " WHERE ddate >= '%s' AND ddate <= '%s'" + \
-            " ORDER BY ddate" % (start, stop)
+            " WHERE ddate >= '%s' AND ddate <= '%s'" % (start, stop) + \
+            " ORDER BY ddate" 
         print q
         self.cur.execute(q)
         if self.absroot != None:
