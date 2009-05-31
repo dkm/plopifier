@@ -116,11 +116,11 @@ class Vimeo:
             title = i[1]
             tags = i[2]
             try :
-                self.set_title(vid, title)
-                self.set_privacy(vid)
+                self.videos_setTitle(vid, title)
+                self.videos_setPrivacy(vid)
 
                 if len(tags) > 0:
-                    self.set_tags(vid, tags)
+                    self.videos_addTags(vid, tags)
                 ok.append(i)
             except CurlyRestException,e:
                 print "Still failing for video ", vid
