@@ -34,6 +34,8 @@ import pycurl
 import urllib
 BASE_URL = "http://vimeo.com/api/rest"
 
+TURNING_BAR='|/-\\'
+
 class VimeoException(Exception):
     def __init__(self, msg):
         Exception.__init__(self)
@@ -59,6 +61,7 @@ class CurlyRequest:
     def __init__(self, pbarsize=19):
         self.buf = None
         self.pbar_size = pbarsize
+        self.pidx = 0
 
     def do_rest_call(self, url):
         res = self.do_request(url)
@@ -84,15 +87,22 @@ class CurlyRequest:
         self.buf = ""
         return p
     
-    def progress(self, download_t, download_d, upload_t, upload_d):
-        done = int(self.pbar_size * upload_t / upload_d)
+    def upload_progress(self, download_t, download_d, upload_t, upload_d):
+        # this is only for upload progress bar
+	if upload_t == 0:
+            return 0
+
+        self.pidx = (self.pidx + 1) % len(TURNING_BAR)
+
+        done = int(self.pbar_size * upload_d / upload_t)
 
         if done != self.pbar_size:
-            pstr = '#'*done + +'>' ' '*(self.pbar_size - done - 1)
+            pstr = '#'*done  +'>' + ' '*(self.pbar_size - done - 1)
         else:
             pstr = '#'*done
 
-        print "[%s]" %pstr
+        print "\r%s[%s]  " %(TURNING_BAR[self.pidx], pstr),
+        return 0
         
     def do_post_call(self, url, args, use_progress=False):
         c = pycurl.Curl()
@@ -106,7 +116,7 @@ class CurlyRequest:
         c.setopt(c.NOPROGRESS, 0)
         
         if use_progress:
-            c.setopt(c.PROGRESSFUNCTION, self.progress)
+            c.setopt(c.PROGRESSFUNCTION, self.upload_progress)
 
         c.perform()
         c.close()
