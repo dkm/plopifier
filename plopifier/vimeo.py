@@ -56,8 +56,9 @@ class CurlyRestException(Exception):
 
 
 class CurlyRequest:
-    def __init__(self):
+    def __init__(self, pbarsize=19):
         self.buf = None
+        self.pbar_size = pbarsize
 
     def do_rest_call(self, url):
         res = self.do_request(url)
@@ -82,8 +83,18 @@ class CurlyRequest:
         p = self.buf
         self.buf = ""
         return p
+    
+    def progress(self, download_t, download_d, upload_t, upload_d):
+        done = int(self.pbar_size * upload_t / upload_d)
 
-    def do_post_call(self, url, args):
+        if done != self.pbar_size:
+            pstr = '#'*done + +'>' ' '*(self.pbar_size - done - 1)
+        else:
+            pstr = '#'*done
+
+        print "[%s]" %pstr
+        
+    def do_post_call(self, url, args, use_progress=False):
         c = pycurl.Curl()
         c.setopt(c.POST, 1)
         c.setopt(c.URL, url)
@@ -91,6 +102,12 @@ class CurlyRequest:
         c.setopt(c.WRITEFUNCTION, self.body_callback)
         #c.setopt(c.VERBOSE, 1)
         self.buf = ""
+
+        c.setopt(c.NOPROGRESS, 0)
+        
+        if use_progress:
+            c.setopt(c.PROGRESSFUNCTION, self.progress)
+
         c.perform()
         c.close()
         res = self.buf
@@ -328,7 +345,7 @@ class Vimeo:
                                        ("api_key", self.apikey),
                                        ("auth_token", self.auth_token),
                                        ("ticket_id", ticket),
-                                       ("api_sig", sig)])
+                                       ("api_sig", sig)], True)
         # the API does not provide any return value
         # for the POST.
     
