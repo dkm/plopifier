@@ -25,6 +25,7 @@ import optparse
 import tempfile
 from datetime import datetime,timedelta
 from subprocess import Popen
+from threading import Thread,Condition,Semaphore
 
 from plopifier import request,vimeo
 from plopifier.vimeo import VimeoException, CurlyRestException
@@ -59,6 +60,7 @@ def build_video (file_list, duration, output_filename, fps=25):
     cmd = "mencoder mf://@%s " %flist
     cmdargs =  "-mf w=640:h=480:fps=%d:type=jpg "  %fps
     cmdargs += "-ovc lavc -lavcopts vcodec=mpeg4:mbd=2:trell -oac copy "
+    cmdargs += "-really-quiet "
 
     cmd += cmdargs
     cmd += "-o " + output_filename
@@ -68,11 +70,54 @@ def build_video (file_list, duration, output_filename, fps=25):
     sts = os.waitpid(p.pid, 0)
     os.unlink(flist)
 
+class Stealer(Thread):
+    def __init__(self, cond, v, day, tags, file_list, duration, output_filename, fps=25):
+        Thread.__init__(self)
+
+        self.sem_lock = Semaphore()
+        self.sem_lock.acquire()
+
+        self.cond = cond
+        self.tags = tags
+        self.day = day
+        self.v = v
+        self.file_list = file_list
+        self.duration = duration
+        self.output_filename = output_filename
+        self.fps = fps
+
+    def run(self):
+        build_video(self.file_list, self.duration, self.output_filename, self.fps)
+        print "BUILDING ", self.output_filename
+        print "GETTING TICKET"
+        ticket = "ABCD"
+        ticket = self.v.videos_getUploadTicket()
+        print "[%s] Finished building video and ticket [%s] acquired, waiting..." %(self.output_filename, ticket)
+        
+        self.sem_lock.release()
+
+##        self.cond.acquire()
+##        self.cond.wait()
+##        self.cond.release()
+        print "[%s] notified, trying to upload!" % self.output_filename
+        try :
+            print "UPLOADING", self.output_filename
+            self.v.do_upload(self.output_filename, 
+                             str(self.day.strftime("%d%m%Y")), 
+                             ticket, self.tags)
+        except VimeoException, e :
+            print "There was an error with Vimeo:"
+            print e
+
+
 def main(argv):
 
     parser = optparse.OptionParser(
         usage='Usage: %prog [options]',
         description="A cloud movi3 generat0r ")
+    parser.add_option('-l', '--thread-killer',
+                      help='enable the multi thread ticket stealer',
+                      action="store_true", default=False)
     parser.add_option('-k', '--vimeo-apikey', metavar='api-key',
                       help='set the "api_key" for vimeo')
     parser.add_option('-s', '--vimeo-secret', metavar='api-secret',
@@ -125,24 +170,61 @@ def main(argv):
     sq = request.Request(options.sqldb_file, options.sqldb_root)
 
     delta = timedelta(1)
-    start = datetime(2007,3,20)
+    start = datetime(2007,7,13)
 
-    morning = timedelta(0,0,0,0,0,6)
-    full_day = timedelta(0,0,0,0,0,15)
+    morning = timedelta(0,0,0,0,30,5)
+    full_day = timedelta(0,0,0,0,30,16)
 
     today = start
+    
+    thread_list = []
+    thread_cond = Condition()
 
-    for i in xrange(20):
+    for i in xrange(3):
         files = sq.get_files(today+morning, today + morning + full_day)
-        build_video(files, 120, "/tmp/saint-eynard.avi")
 
-        try :
-            v.do_upload("/tmp/saint-eynard.avi", str(today.strftime("%d%m%Y")), tags)
-        except VimeoException, e :
-            print "There was an error with Vimeo:"
-            print e
+        if options.thread_killer :
+            tv = vimeo.Vimeo(options.vimeo_apikey,
+                             options.vimeo_secret,
+                             options.vimeo_authtoken)
+            t = Stealer(thread_cond, tv, today, tags, files, 110, "/tmp/saint-eynard-%d.avi" %i)
+            t.start()
+            thread_list.append(t)
+        else:
+            build_video(files, 110, "/tmp/saint-eynard.avi")
+
+            try :
+                v.do_upload("/tmp/saint-eynard.avi", str(today.strftime("%d%m%Y")), tags)
+            except VimeoException, e :
+                print "There was an error with Vimeo:"
+                print e
+                break
+            v.process_bug_queue()
         today += delta
-        v.process_bug_queue()
+    
+    if options.thread_killer:
+        print "Will handler the killers!"
+        for t in thread_list:
+            print "Get lock...", 
+            t.sem_lock.acquire()
+            print "OK!"
+
+##        print "Notifying all...",
+##        for t in thread_list:
+##            thread_cond.acquire()
+##            thread_cond.notifyAll()
+##            thread_cond.release()
+##            print "!",
+##        print " OK!"
+
+        print "ok!"
+        for t in thread_list:
+            print "TRY JOIN...",
+            t.join()
+            print "JOINED!"
+    else:
+        print "not fun, no thread!"
+    
 
 
 if __name__ == '__main__':
