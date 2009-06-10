@@ -194,7 +194,7 @@ def main(argv):
             build_video(files, 110, "/tmp/saint-eynard.avi")
 
             try :
-                v.do_upload("/tmp/saint-eynard.avi", str(today.strftime("%d%m%Y")), tags)
+                v.do_upload("/tmp/saint-eynard.avi", str(today.strftime("%d%m%Y")), tags=tags)
             except VimeoException, e :
                 print "There was an error with Vimeo:"
                 print e
