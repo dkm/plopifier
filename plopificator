@@ -59,7 +59,7 @@ def build_video (file_list, duration, output_filename, fps=25):
     cmd = "mencoder mf://@%s " %flist
     cmdargs =  "-mf w=640:h=480:fps=%d:type=jpg "  %fps
     cmdargs += "-ovc lavc -lavcopts vcodec=mpeg4:mbd=2:trell -oac copy "
-
+    cmdargs += "-really-quiet "
     cmd += cmdargs
     cmd += "-o " + output_filename
     
