@@ -189,12 +189,14 @@ class Vimeo:
         return burl+url
 
 
-    def do_upload(self, video, title, tags=[]):
+    def do_upload(self, video, title, ticket=None, tags=[]):
         if self.auth_token == None:
             raise VimeoException()
 
-
-        upload_ticket = self.videos_getUploadTicket()
+        if ticket != None:
+            upload_ticket = ticket
+        else:
+            upload_ticket = self.videos_getUploadTicket()
 
         self.upload(video, upload_ticket)
 
