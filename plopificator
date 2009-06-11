@@ -21,6 +21,7 @@
 import sys
 import os
 import optparse
+import time
 
 import tempfile
 from datetime import datetime,timedelta
@@ -115,9 +116,15 @@ def main(argv):
     parser = optparse.OptionParser(
         usage='Usage: %prog [options]',
         description="A cloud movi3 generat0r ")
-    parser.add_option('-l', '--thread-killer',
-                      help='enable the multi thread ticket stealer',
+
+    parser.add_option('-n', '--number',
+                      help="Specify the number of videos to create & upload",
+                      default=10, type="int")
+    parser.add_option('--prefetch-tickets',
                       action="store_true", default=False)
+#     parser.add_option('-l', '--thread-killer',
+#                       help='enable the multi thread ticket stealer',
+#                       action="store_true", default=False)
     parser.add_option('-k', '--vimeo-apikey', metavar='api-key',
                       help='set the "api_key" for vimeo')
     parser.add_option('-s', '--vimeo-secret', metavar='api-secret',
@@ -170,44 +177,52 @@ def main(argv):
     sq = request.Request(options.sqldb_file, options.sqldb_root)
 
     delta = timedelta(1)
-    start = datetime(2007,7,13)
+    start = datetime(2007,8,14)
 
     morning = timedelta(0,0,0,0,30,5)
     full_day = timedelta(0,0,0,0,30,16)
 
     today = start
     
-    thread_list = []
-    thread_cond = Condition()
+#     thread_list = []
+#     thread_cond = Condition()
 
-    for i in xrange(3):
+    tickets = []
+    if options.prefetch_tickets:
+        tickets = [v.videos_getUploadTicket() for x in xrange(options.number)]
+    
+
+    for i in xrange(options.number):
         files = sq.get_files(today+morning, today + morning + full_day)
 
-        if options.thread_killer :
-            tv = vimeo.Vimeo(options.vimeo_apikey,
-                             options.vimeo_secret,
-                             options.vimeo_authtoken)
-            t = Stealer(thread_cond, tv, today, tags, files, 110, "/tmp/saint-eynard-%d.avi" %i)
-            t.start()
-            thread_list.append(t)
-        else:
-            build_video(files, 110, "/tmp/saint-eynard.avi")
+        build_video(files, 110, "/tmp/saint-eynard.avi")
 
-            try :
-                v.do_upload("/tmp/saint-eynard.avi", str(today.strftime("%d%m%Y")), tags=tags)
-            except VimeoException, e :
-                print "There was an error with Vimeo:"
-                print e
-                break
-            v.process_bug_queue()
+        if options.prefetch_tickets:
+            ticket = tickets[0]
+            tickets = ticket[1:]
+        else:
+            ticket = None
+
+        try :
+            v.do_upload("/tmp/saint-eynard.avi", str(today.strftime("%d%m%Y")), 
+                        ticket=ticket, tags=tags)
+        except VimeoException, e :
+            print "There was an error with Vimeo:"
+            print e
+            break
+        v.process_bug_queue()
         today += delta
     
-    if options.thread_killer:
-        print "Will handler the killers!"
-        for t in thread_list:
-            print "Get lock...", 
-            t.sem_lock.acquire()
-            print "OK!"
+    while len(v.vimeo_bug_queue) > 0:
+        v.process_bug_queue()
+        time.sleep(1)
+
+#     if options.thread_killer:
+#         print "Will handler the killers!"
+#         for t in thread_list:
+#             print "Get lock...", 
+#             t.sem_lock.acquire()
+#             print "OK!"
 
 ##        print "Notifying all...",
 ##        for t in thread_list:
@@ -217,13 +232,13 @@ def main(argv):
 ##            print "!",
 ##        print " OK!"
 
-        print "ok!"
-        for t in thread_list:
-            print "TRY JOIN...",
-            t.join()
-            print "JOINED!"
-    else:
-        print "not fun, no thread!"
+#         print "ok!"
+#         for t in thread_list:
+#             print "TRY JOIN...",
+#             t.join()
+#             print "JOINED!"
+#     else:
+#         print "not fun, no thread!"
     
 
 
