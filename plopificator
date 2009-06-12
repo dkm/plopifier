@@ -176,7 +176,7 @@ def main(argv):
     sq = request.Request(options.sqldb_file, options.sqldb_root)
 
     delta = timedelta(1)
-    start = datetime(2007,8,14)
+    start = datetime(2007,9,29)
 
     morning = timedelta(0,0,0,0,30,5)
     full_day = timedelta(0,0,0,0,30,16)
@@ -197,8 +197,9 @@ def main(argv):
         build_video(files, 110, "/tmp/saint-eynard.avi")
 
         if options.prefetch_tickets:
+            print "I have %d tickets. Video index is %d" % (len(tickets), i)
             ticket = tickets[0]
-            tickets = ticket[1:]
+            tickets = tickets[1:]
         else:
             ticket = None
 
