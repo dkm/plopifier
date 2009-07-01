@@ -65,13 +65,17 @@ class CurlyRequest:
 
     def do_rest_call(self, url):
         res = self.do_request(url)
-        t = ET.fromstring(res)
+        try:
+            t = ET.fromstring(res)
 
-        if t.attrib['stat'] == 'fail':
-            err_code = t.find('err').attrib['code']
-            err_msg = t.find('err').attrib['msg']
-            raise CurlyRestException(err_code, err_msg, ET.tostring(t))
-        return t
+            if t.attrib['stat'] == 'fail':
+                err_code = t.find('err').attrib['code']
+                err_msg = t.find('err').attrib['msg']
+                raise CurlyRestException(err_code, err_msg, ET.tostring(t))
+            return t
+        except Exception,e:
+            print "Error with:", res
+            raise e
 
     def body_callback(self, buf):
         self.buf += buf
@@ -134,6 +138,12 @@ class Vimeo:
         self.user_dic = None
         self.curly = CurlyRequest()
         self.vimeo_bug_queue = []
+        self.user_id = None
+
+
+    def set_userid(self):
+        (p,u) = self.auth_checkToken()
+        self.user_id = u['id']
 
     def process_bug_queue(self):
         ok = []
@@ -265,6 +275,7 @@ class Vimeo:
         (url, sig) = self.get_url_sig({'api_key': self.apikey,
                                        'auth_token': self.auth_token,
                                        'video_id' : video_id,
+                                       'user_id': self.user_id,
                                        'privacy': privacy,
                                        'method' : m})
         t = self.curly.do_rest_call(BASE_URL + url)
@@ -293,6 +304,7 @@ class Vimeo:
         (url, sig) = self.get_url_sig({'api_key': self.apikey,
                                        'auth_token': self.auth_token,
                                        'video_id' : video_id,
+                                       'user_id': self.user_id,
                                        'title' : title,
                                        'method' : 'vimeo.videos.setTitle'})
 
@@ -306,6 +318,7 @@ class Vimeo:
         (url, sig) = self.get_url_sig({'api_key': self.apikey,
                                        'auth_token': self.auth_token,
                                        'video_id' : video_id,
+                                       'user_id' : self.user_id,
                                        'tags' : ",".join(ntags),
                                        'method': 'vimeo.videos.addTags'})
         t = self.curly.do_rest_call(BASE_URL + url)
@@ -315,9 +328,14 @@ class Vimeo:
         if self.auth_token == None:
             raise VimeoException("Missing authentication token!")
 
+        if self.user_id == None:
+            raise VimeoException("Missing user_id, you have to " +
+                                 "call set_userid() first!")
+
         m = "vimeo.videos.getUploadTicket"
         (url, sig) = self.get_url_sig({'api_key' : self.apikey,
                                        'auth_token': self.auth_token,
+                                       'user_id': self.user_id,
                                        'method': m})
 
         t = self.curly.do_rest_call(BASE_URL + url)
@@ -336,6 +354,7 @@ class Vimeo:
         (url, sig) = self.get_url_sig({'api_key': self.apikey,
                                        'auth_token': self.auth_token,
                                        'ticket_id': ticket,
+                                       'user_id': self.user_id,
                                        'method' : "vimeo.videos.checkUploadStatus"})
         url = BASE_URL + url
         t = self.curly.do_rest_call(url)
@@ -384,7 +403,18 @@ class Vimeo:
 # <rsp stat="ok"></rsp>
 
     def auth_checkToken(self):
-        pass
+        (url,sig) = self.get_url_sig({'api_key': self.apikey,
+                                      'auth_token': self.auth_token,
+                                      'method': 'vimeo.auth.checkToken'})
+        url = BASE_URL + url
+        t = self.curly.do_rest_call(url)
+        user_e = t.find('auth/user')
+        user = {'id':user_e.attrib['id'],
+                'username': user_e.attrib['username'],
+                'fullname': user_e.attrib['fullname']}
+        perms = t.find('auth/perms').text
+        return (perms, user)
+
 #     vimeo.auth.checkToken
 # Checks the validity of the token. Returns the user associated with it.
 # Returns the same as vimeo.auth.getToken
