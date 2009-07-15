@@ -28,8 +28,9 @@ from datetime import datetime,timedelta
 from subprocess import Popen
 from threading import Thread,Condition,Semaphore
 
-from plopifier import request,vimeo
-from plopifier.vimeo import VimeoException, CurlyRestException
+from plopifier import request
+import vimeo
+from vimeo import VimeoException, CurlyRestException
 
 #mencoder mf://@filelist.ok 
 #  -mf w=640:h=480:fps=25:type=jpg 
@@ -183,9 +184,9 @@ def main(argv):
     sq = request.Request(options.sqldb_file, options.sqldb_root)
 
     delta = timedelta(1)
-    start = datetime(2007,9,29)
+    start = datetime(2008,8,7)
 
-    morning = timedelta(0,0,0,0,30,5)
+    morning = timedelta(0,0,0,0,00,6)
     full_day = timedelta(0,0,0,0,30,16)
 
     today = start
